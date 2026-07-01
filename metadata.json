@@ -1,0 +1,6 @@
+{
+  "name": "Adaptive AI Typing App",
+  "description": "An intelligent typing application that tracks accuracy and speed, detects key weaknesses, and uses AI to generate custom, adaptive lessons.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
