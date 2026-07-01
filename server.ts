@@ -157,10 +157,10 @@ app.post("/api/leaderboard", (req: Request, res: Response) => {
 
 // App endpoint for AI adaptive custom typing lesson
 app.post("/api/generate-lesson", async (req: Request, res: Response) => {
-  const { weakKeys = [], difficulty = "intermediate", type = "general", language = "english" } = req.body;
+  const { weakKeys = [], difficulty = "intermediate", type = "general", language = "english", useAi = true } = req.body;
   
   const client = getAiClient();
-  if (!client) {
+  if (!client || useAi === false) {
     // Fail gracefully by serving a locally computed adaptive drill
     if (type === "coding") {
       return res.json(generateLocalFallbackCoding(language, difficulty));
@@ -177,7 +177,7 @@ Focus on standard programmer symbols (brackets, semi-colons, operators, quotes) 
 Ensure it returns standard JSON adhering to instructions.`;
 
       const response = await client.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           systemInstruction: "You generate functional educational code snippets for typing practice. Return a strictly validated JSON structure.",
@@ -201,11 +201,7 @@ Ensure it returns standard JSON adhering to instructions.`;
       const weakKeysStr = weakKeys.length > 0 ? weakKeys.join(", ") : "general keys";
       const prompt = `Generate a customized English typing lesson containing funny relationship advice and Gen Z dark comedy.
 Make it highly engaging, alive, and fun.
-You MUST include these three phrases separately in the generated text (do not combine them into one sentence):
-1. "dont take a lamborghini from didy"
-2. "dont go near epstien"
-3. "use protection virus can come from anywhere"
-Include other fun, dark humor and relatable gen z relationship advice like "bro touched grass once and called it character development".
+Include fun, dark humor and relatable gen z relationship advice.
 The output MUST be normal sentences with standard punctuation and capitalization.
 Ensure the text is around 30-50 words total.
 Prioritize and heavily focus on practicing words that contain or emphasize these physical keyboard keys: [${weakKeysStr}].
@@ -213,7 +209,7 @@ Target difficulty: ${difficulty}.
 Ensure it returns standard JSON with title, text, and description explaining which keys and transition targets are emphasized.`;
 
       const response = await client.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: prompt,
         config: {
           systemInstruction: "You are a Gen Z dark comedy tactile typing coach. Create adaptive lessons featuring funny, edgy sentences for character finger agility. Return a verified JSON structure.",
@@ -299,7 +295,7 @@ ${recentHits || "No tests completed yet."}
 Provide a direct, scannable JSON object adhering carefully to the schema. Include ergonomic tips, wrist/finger tips for their specific weak keys, and a curated plan.`;
 
     const response = await client.models.generateContent({
-      model: "gemini-3.5-flash",
+      model: "gemini-2.5-flash",
       contents: prompt,
       config: {
         systemInstruction: "You analyze typing physics and metrics to generate friendly ergonomic advice. Return a validated schema.",

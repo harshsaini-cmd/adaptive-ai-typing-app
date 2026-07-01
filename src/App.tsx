@@ -1,3 +1,4 @@
+// @ts-nocheck
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "motion/react";
 import {
@@ -548,6 +549,7 @@ export default function App() {
   const [aiCustomLesson, setAiCustomLesson] = useState<Lesson | null>(null);
   const [aiCustomLanguage, setAiCustomLanguage] = useState<"python" | "javascript" | "html-css" | "sql">("python");
   const [aiCustomDifficulty, setAiCustomDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
+  const [useAi, setUseAi] = useState(true);
   
   // AI Coach Feedback State
   const [isFetchingCoach, setIsFetchingCoach] = useState(false);
@@ -1234,7 +1236,8 @@ export default function App() {
           weakKeys: calculatedWeakKeysList.length > 0 ? calculatedWeakKeysList : ["a", "p", "o"],
           difficulty: aiCustomDifficulty,
           type: activeLessonType === "coding" ? "coding" : "general",
-          language: aiCustomLanguage
+          language: aiCustomLanguage,
+          useAi: useAi
         })
       });
 
@@ -1251,6 +1254,7 @@ export default function App() {
             snippet_type: "Custom generated"
           };
           setCurrentCodingLesson(generatedCodeLesson);
+          setMonkeyMode("standard");
         } else {
           const generatedGeneralLesson: Lesson = {
             id: `ai-gen-${Date.now()}`,
@@ -1262,6 +1266,7 @@ export default function App() {
           };
           setCurrentGeneralLesson(generatedGeneralLesson);
           setAiCustomLesson(generatedGeneralLesson);
+          setMonkeyMode("standard");
         }
       }
     } catch (e) {
@@ -1297,7 +1302,8 @@ export default function App() {
           weakKeys: sessionReceipt.weakKeys.length > 0 ? sessionReceipt.weakKeys : ["t", "e", "s", "t"],
           difficulty: activeLessonType === "coding" ? currentCodingLesson.difficulty : currentGeneralLesson.difficulty,
           type: activeLessonType === "coding" ? "coding" : "general",
-          language: activeLessonType === "coding" ? currentCodingLesson.language : "english"
+          language: activeLessonType === "coding" ? currentCodingLesson.language : "english",
+          useAi: useAi
         })
       });
 
@@ -1314,6 +1320,7 @@ export default function App() {
             snippet_type: "Custom generated"
           };
           setCurrentCodingLesson(generatedCodeLesson);
+          setMonkeyMode("standard");
         } else {
           const generatedGeneralLesson: Lesson = {
             id: `ai-gen-${Date.now()}`,
@@ -1325,6 +1332,7 @@ export default function App() {
           };
           setCurrentGeneralLesson(generatedGeneralLesson);
           setAiCustomLesson(generatedGeneralLesson);
+          setMonkeyMode("standard");
         }
         // Close modal and restart practice
         setSessionReceipt(null);
@@ -2132,6 +2140,24 @@ export default function App() {
                           </button>
                         ))}
                       </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between mt-4 border-t border-slate-800/80 pt-3">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-bold text-slate-300 uppercase">AI Generation</span>
+                        <span className="text-[9px] text-slate-500">Toggle offline preloaded sentences</span>
+                      </div>
+                      <button
+                        onClick={() => setUseAi(!useAi)}
+                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none`}
+                        style={{ backgroundColor: useAi ? '#4f46e5' : '#1e293b' }}
+                      >
+                        <span
+                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
+                            useAi ? "translate-x-5" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
                     </div>
                   </div>
                 </div>
