@@ -39,26 +39,41 @@ const ENGLISH_WORD_LIST = [
   "quiz", "exit", "valve", "quartz", "pharaoh", "keyboard", "rhythm", "aesthetic", "python", "developer", "typescript"
 ];
 
-function generateLocalFallbackLesson(weakKeys: string[], difficulty: string): { title: string; text: string; description: string } {
-  // If we have weak keys, find words from our vocabulary that contain them
-  const fallbackSentences = [
-    "bro touched grass once and called it character development",
-    "dont take a lamborghini from didy",
-    "dont go near epstien",
-    "use protection virus can come from anywhere",
-    "wifi stronger than your situationship",
-    "typing faster will not fix your life but keep going",
-    "every notification is a side quest"
+function generateLocalFallbackLesson(weakKeys: string[], difficulty: string, type: string = "general"): { title: string; text: string; description: string } {
+  if (type === "genz") {
+    const fallbackSentences = [
+      "bro touched grass once and called it character development",
+      "dont take a lamborghini from diddy",
+      "dont go near epstein",
+      "use protection virus can come from anywhere",
+      "wifi stronger than your situationship",
+      "typing faster will not fix your life but keep going",
+      "every notification is a side quest"
+    ];
+    fallbackSentences.sort(() => Math.random() - 0.5);
+    const text = fallbackSentences.slice(0, 3).join(" ");
+    
+    return {
+      title: `GenZ Edge Drill (${difficulty.toUpperCase()})`,
+      text: text,
+      description: `Typing highly relatable dark humor and side quests. (Offline Fallback)`
+    };
+  }
+
+  const standardSentences = [
+    "the quick brown fox jumps over the lazy dog",
+    "practice makes perfect when you are trying to improve",
+    "focus on the keys you find difficult to reach",
+    "speed comes naturally after you master accuracy",
+    "always keep your hands in the home row position"
   ];
-  
-  // Shuffle words slightly to make the typing challenge unique
-  fallbackSentences.sort(() => Math.random() - 0.5);
-  const text = fallbackSentences.slice(0, 3).join(" ");
+  standardSentences.sort(() => Math.random() - 0.5);
+  const text = standardSentences.slice(0, 3).join(" ");
   
   return {
-    title: `Edgy Adaptive Drill (${difficulty.toUpperCase()})`,
+    title: `Weak Keys Drill (${difficulty.toUpperCase()})`,
     text: text,
-    description: `Focus on keyboard rows featuring your weak keys: ${weakKeys.join(", ") || "General Practice"}. (Offline Gen Z fallback mode)`
+    description: `Focus on keyboard rows featuring your weak keys: ${weakKeys.join(", ") || "General Practice"}. (Offline Fallback)`
   };
 }
 
@@ -157,15 +172,15 @@ app.post("/api/leaderboard", (req: Request, res: Response) => {
 
 // App endpoint for AI adaptive custom typing lesson
 app.post("/api/generate-lesson", async (req: Request, res: Response) => {
-  const { weakKeys = [], difficulty = "intermediate", type = "general", language = "english", useAi = true } = req.body;
+  const { weakKeys = [], difficulty = "intermediate", type = "general", language = "english" } = req.body;
   
   const client = getAiClient();
-  if (!client || useAi === false) {
+  if (!client) {
     // Fail gracefully by serving a locally computed adaptive drill
     if (type === "coding") {
       return res.json(generateLocalFallbackCoding(language, difficulty));
     }
-    return res.json(generateLocalFallbackLesson(weakKeys, difficulty));
+    return res.json(generateLocalFallbackLesson(weakKeys, difficulty, type));
   }
 
   try {
@@ -177,7 +192,7 @@ Focus on standard programmer symbols (brackets, semi-colons, operators, quotes) 
 Ensure it returns standard JSON adhering to instructions.`;
 
       const response = await client.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: prompt,
         config: {
           systemInstruction: "You generate functional educational code snippets for typing practice. Return a strictly validated JSON structure.",
@@ -196,20 +211,21 @@ Ensure it returns standard JSON adhering to instructions.`;
 
       const parsed = JSON.parse(response.text?.trim() || "{}");
       return res.json(parsed);
-    } else {
-      // General typing lessons focused on weak keys: Funny dark comedy sentences
-      const weakKeysStr = weakKeys.length > 0 ? weakKeys.join(", ") : "general keys";
+    } else if (type === "genz") {
       const prompt = `Generate a customized English typing lesson containing funny relationship advice and Gen Z dark comedy.
 Make it highly engaging, alive, and fun.
-Include fun, dark humor and relatable gen z relationship advice.
+You MUST include these three phrases separately in the generated text (do not combine them into one sentence):
+1. "dont take a lamborghini from diddy"
+2. "dont go near epstein"
+3. "use protection virus can come from anywhere"
+Include other fun, dark humor and relatable gen z relationship advice like "bro touched grass once and called it character development".
 The output MUST be normal sentences with standard punctuation and capitalization.
 Ensure the text is around 30-50 words total.
-Prioritize and heavily focus on practicing words that contain or emphasize these physical keyboard keys: [${weakKeysStr}].
 Target difficulty: ${difficulty}.
 Ensure it returns standard JSON with title, text, and description explaining which keys and transition targets are emphasized.`;
 
       const response = await client.models.generateContent({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.5-flash",
         contents: prompt,
         config: {
           systemInstruction: "You are a Gen Z dark comedy tactile typing coach. Create adaptive lessons featuring funny, edgy sentences for character finger agility. Return a verified JSON structure.",
@@ -220,6 +236,36 @@ Ensure it returns standard JSON with title, text, and description explaining whi
               title: { type: Type.STRING, description: "Actionable, funny name of the word-based lesson" },
               text: { type: Type.STRING, description: "The custom sentences targeting the physical letters to type" },
               description: { type: Type.STRING, description: "Professional but funny advice explaining which keys are being targeted" }
+            },
+            required: ["title", "text", "description"]
+          }
+        }
+      });
+
+      const parsed = JSON.parse(response.text?.trim() || "{}");
+      return res.json(parsed);
+    } else {
+      // General typing lessons focused on weak keys: Standard sentences
+      const weakKeysStr = weakKeys.length > 0 ? weakKeys.join(", ") : "general keys";
+      const prompt = `Generate a standard English typing lesson focused on character finger agility.
+The output MUST be normal sentences with standard punctuation and capitalization.
+Ensure the text is around 30-50 words total.
+Prioritize and heavily focus on practicing words that contain or emphasize these physical keyboard keys: [${weakKeysStr}].
+Target difficulty: ${difficulty}.
+Ensure it returns standard JSON with title, text, and description explaining which keys and transition targets are emphasized.`;
+
+      const response = await client.models.generateContent({
+        model: "gemini-3.5-flash",
+        contents: prompt,
+        config: {
+          systemInstruction: "You are a professional typing coach. Create adaptive lessons featuring sentences for character finger agility. Return a verified JSON structure.",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING, description: "Actionable name of the word-based lesson" },
+              text: { type: Type.STRING, description: "The custom sentences targeting the physical letters to type" },
+              description: { type: Type.STRING, description: "Professional advice explaining which keys are being targeted" }
             },
             required: ["title", "text", "description"]
           }
@@ -295,7 +341,7 @@ ${recentHits || "No tests completed yet."}
 Provide a direct, scannable JSON object adhering carefully to the schema. Include ergonomic tips, wrist/finger tips for their specific weak keys, and a curated plan.`;
 
     const response = await client.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3.5-flash",
       contents: prompt,
       config: {
         systemInstruction: "You analyze typing physics and metrics to generate friendly ergonomic advice. Return a validated schema.",

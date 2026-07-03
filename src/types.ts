@@ -25,7 +25,7 @@ export interface UserProfile {
   layout: KeyboardLayout;
   theme?: 'cosmic' | 'terminal' | 'sepia' | 'aurora' | 'sakura' | 'blueblack';
   soundEnabled?: boolean;
-  soundType?: 'click' | 'thud';
+  soundType?: 'click' | 'thud' | 'moan';
   streakDays: number;
   maxStreakDays: number;
   lastPracticeDate: string | null;
@@ -37,7 +37,7 @@ export interface UserProfile {
 export interface Lesson {
   id: string;
   title: string;
-  category: 'Home Row' | 'Top Row' | 'Bottom Row' | 'Numbers' | 'Numpad' | 'Curated Sentences' | 'Paragraphs' | 'AI Custom' | 'Capitalization' | 'Symbols' | 'Basics: Home Row' | 'Basics: Top Row' | 'Basics: Bottom Row' | 'Mastery: N-Grams' | 'Pro Tips: Sentences' | 'Advanced: Shift & Caps' | 'Advanced: Numbers & Symbols';
+  category: 'Home Row' | 'Top Row' | 'Bottom Row' | 'Numbers' | 'Numpad' | 'Curated Sentences' | 'Paragraphs' | 'AI Custom' | 'Capitalization' | 'Symbols';
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   text: string;
   description: string;
@@ -55,7 +55,7 @@ export interface CodingLesson {
 
 export interface ShortcutLesson {
   id: string;
-  platform: 'Windows/Linux' | 'macOS' | 'VS Code' | 'Browser' | 'Universal';
+  platform: 'Windows/Linux' | 'macOS' | 'VS Code' | 'Browser';
   title: string;
   keys: string[]; // e.g. ['Control', 'c']
   description: string;

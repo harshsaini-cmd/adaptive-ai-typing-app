@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { motion } from "motion/react";
 import {
@@ -48,7 +47,7 @@ import {
 } from "./data/lessons";
 import Keyboard from "./components/Keyboard";
 import { THEMES, ThemeId } from "./data/themes";
-import { playKeyClickSound, playKeyThudSound } from "./utils/sound";
+import { playTypingSound, preloadAllPacks } from "./utils/sound";
 
 // Initial Profile setup with offline local persistence fallback
 const DEFAULT_PROFILE: UserProfile = {
@@ -322,15 +321,39 @@ const EDGY_SENTENCES = [
   "sleep schedule is more broken than my last relationship",
   "dont take a lamborghini from diddy",
   "dont go near epstein",
-  "use protection virus can come from anywhere"
+  "use protection virus can come from anywhere",
+  "the canon event wasn't optional after all",
+  "my sleep schedule is a social experiment",
+  "the emotional damage subscription renewed automatically",
+  "the trust expired before the warranty did",
+  "i collect red flags like achievement badges",
+  "even my imaginary arguments have plot holes",
+  "the healing update keeps getting delayed",
+  "life patched the bugs but added new ones",
+  "the universe definitely skipped the tutorial",
+  "i'm emotionally buffering, please wait"
 ];
 
 const EDGY_PRIORITY_INDICES = [
   0, 1, 2, 3, 6, 7, 9, 10, 11, 12, 14, 16, 18, 19, 22, 23, 24, 26, 28, 29, 30, 32, 34, 35, 36, 37, 38, 41, 43, 44, 46, 47, 52, 53, 54, 55, 57, 60, 62, 63, 67, 69, 70, 71, 75, 76, 78, 81, 83, 85, 86, 87, 91, 92, 94, 95, 97, 98, 99, 104, 106, 107, 108
 ];
 
-function generateMonkeyWords(limit: number, weakKeys: string[] = [], includeNumbers: boolean = false, includeSymbols: boolean = false): string {
-  const generateSentence = () => {
+const GENZ_SLOP_WORDS = [
+  "skibidi", "rizz", "gyatt", "sigma", "ohio", "fanum tax", "mewing", "looksmaxxing", "edge", "bussin", 
+  "cap", "no cap", "bet", "sus", "yeet", "mid", "based", "cringe", "goated", "sheesh", 
+  "lit", "fr", "ong", "yap", "yapper", "delulu", "npc", "main character", "slay", "ratio", 
+  "W", "L", "glaze", "aura", "grimace shake", "goof yah", "vibes", "bruh", "cooked", "let him cook", 
+  "brainrot", "pookie", "griddy", "touch grass", "side quest", "situationship", "rent free"
+];
+
+function generateMonkeyWords(
+  limit: number, 
+  weakKeys: string[] = [], 
+  includeNumbers: boolean = false, 
+  includeSymbols: boolean = false,
+  mode: 'standard' | 'genz_sentences' | 'genz_words' = 'standard'
+): string {
+  if (mode === 'genz_sentences') {
     let index = 0;
     if (Math.random() < 0.7) {
       index = EDGY_PRIORITY_INDICES[Math.floor(Math.random() * EDGY_PRIORITY_INDICES.length)];
@@ -368,7 +391,6 @@ function generateMonkeyWords(limit: number, weakKeys: string[] = [], includeNumb
       sentence = words.join(" ");
     }
     
-    // Add extra random punctuation/symbols inside the sentence randomly if symbols are on
     if (includeSymbols && Math.random() < 0.3) {
       const SYMBOLS = ["-", "@", "#", "$", "%", "&", "*", "(", ")"];
       const sym = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
@@ -378,10 +400,40 @@ function generateMonkeyWords(limit: number, weakKeys: string[] = [], includeNumb
       sentence = words.join(" ");
     }
     return sentence;
-  };
+  }
 
-  // Return a single randomly generated or selected sentence
-  return generateSentence();
+  const pool = mode === 'genz_words' ? GENZ_SLOP_WORDS : COMMON_TYPING_WORDS;
+  
+  let filteredPool = pool;
+  if (weakKeys.length > 0) {
+    const subset = pool.filter(w => weakKeys.some(k => w.includes(k)));
+    if (subset.length > 5) {
+      filteredPool = subset;
+    }
+  }
+
+  const result: string[] = [];
+  for (let i = 0; i < limit; i++) {
+    const source = (weakKeys.length > 0 && Math.random() < 0.7) ? filteredPool : pool;
+    let word = source[Math.floor(Math.random() * source.length)];
+    
+    if (includeSymbols && Math.random() < 0.2) {
+      const SYMBOLS = ["-", "@", "#", "$", "%", "&", "*", "(", ")", "!", "?", ".", ","];
+      word += SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+    }
+    
+    if (includeNumbers && Math.random() < 0.1) {
+      word += Math.floor(Math.random() * 100).toString();
+    }
+    
+    if (includeSymbols && Math.random() < 0.1) {
+      word = word.charAt(0).toUpperCase() + word.slice(1);
+    }
+    
+    result.push(word);
+  }
+  
+  return result.join(" ");
 }
 
 interface TextToken {
@@ -434,7 +486,7 @@ function tokenizeText(text: string): TextToken[] {
 
 export default function App() {
   // Navigation
-  const [activeTab, setActiveTab] = useState<"practice" | "lessons" | "analytics" | "coach">("practice");
+  const [activeTab, setActiveTab] = useState<"practice" | "genz type" | "analytics">("practice");
   const [activeLessonType, setActiveLessonType] = useState<"general" | "coding" | "shortcut">("general");
 
   // User Profile
@@ -452,6 +504,14 @@ export default function App() {
 
   // Active Typing State
   const [currentGeneralLesson, setCurrentGeneralLesson] = useState<Lesson>(CURATED_LESSONS[0]);
+  const [currentGenzLesson, setCurrentGenzLesson] = useState<Lesson>({
+    id: "genz-default",
+    title: "GenZ Dark Comedy",
+    category: "General",
+    difficulty: "intermediate",
+    text: "bro touched grass once and called it character development",
+    description: "Highly relatable dark humor."
+  });
   const [currentCodingLesson, setCurrentCodingLesson] = useState<CodingLesson>(CODING_LESSONS[0]);
   const [currentShortcutLesson, setCurrentShortcutLesson] = useState<ShortcutLesson>(SHORTCUT_LESSONS[0]);
 
@@ -549,7 +609,6 @@ export default function App() {
   const [aiCustomLesson, setAiCustomLesson] = useState<Lesson | null>(null);
   const [aiCustomLanguage, setAiCustomLanguage] = useState<"python" | "javascript" | "html-css" | "sql">("python");
   const [aiCustomDifficulty, setAiCustomDifficulty] = useState<"beginner" | "intermediate" | "advanced">("intermediate");
-  const [useAi, setUseAi] = useState(true);
   
   // AI Coach Feedback State
   const [isFetchingCoach, setIsFetchingCoach] = useState(false);
@@ -587,6 +646,9 @@ export default function App() {
 
   // Generate an objective target string based on practice mode
   const targetText = useMemo(() => {
+    if (activeTab === "genz type") {
+      return currentGenzLesson.text;
+    }
     if (activeLessonType === "coding") {
       return currentCodingLesson.code;
     }
@@ -595,22 +657,29 @@ export default function App() {
       return currentShortcutLesson.keys.join(" + ");
     }
     return currentGeneralLesson.text;
-  }, [activeLessonType, currentGeneralLesson, currentCodingLesson, currentShortcutLesson]);
+  }, [activeTab, currentGenzLesson, activeLessonType, currentGeneralLesson, currentCodingLesson, currentShortcutLesson]);
 
   // Adapt targetText based on MonkeyType constraints
   const displayTargetText = useMemo(() => {
     let originalText = targetText;
-    if (activeLessonType === "shortcut") return originalText;
+    if (activeLessonType === "shortcut" && activeTab !== "genz type") return originalText;
+
+    if (activeTab === "genz type") {
+      if (timeTrialSentences.length > 0) {
+        return timeTrialSentences[0];
+      }
+      return currentGenzLesson.text;
+    }
 
     if (monkeyMode === "words" || monkeyMode === "time") {
       if (timeTrialSentences.length > 0) {
         return timeTrialSentences[0];
       }
-      return generateMonkeyWords(10, calculatedWeakKeysList, includeNumbers, includeSymbols);
+      return generateMonkeyWords(10, activeLessonType === "coding" ? calculatedWeakKeysList : [], includeNumbers, includeSymbols, 'standard');
     }
 
     return originalText;
-  }, [targetText, monkeyMode, monkeyLimit, activeLessonType, monkeySeed, calculatedWeakKeysList, timeTrialSentences, includeNumbers, includeSymbols]);
+  }, [targetText, monkeyMode, monkeyLimit, activeLessonType, monkeySeed, calculatedWeakKeysList, timeTrialSentences, includeNumbers, includeSymbols, activeTab, currentGenzLesson]);
 
   const tokens = useMemo(() => tokenizeText(displayTargetText), [displayTargetText]);
 
@@ -632,9 +701,19 @@ export default function App() {
     setHistoricalTypedLength(0);
     setHistoricalWordCount(0);
     
-    if (monkeyMode === "time" || monkeyMode === "words") {
-      const s1 = generateMonkeyWords(10, calculatedWeakKeysList, includeNumbers, includeSymbols);
-      const s2 = generateMonkeyWords(10, calculatedWeakKeysList, includeNumbers, includeSymbols);
+    if (activeTab === "genz type") {
+      if (monkeyMode === "words") {
+        const g1 = generateMonkeyWords(10, [], includeNumbers, includeSymbols, 'genz_words');
+        const g2 = generateMonkeyWords(10, [], includeNumbers, includeSymbols, 'genz_words');
+        setTimeTrialSentences([g1, g2]);
+      } else {
+        const g1 = generateMonkeyWords(10, [], includeNumbers, includeSymbols, 'genz_sentences');
+        const g2 = generateMonkeyWords(10, [], includeNumbers, includeSymbols, 'genz_sentences');
+        setTimeTrialSentences([g1, g2]);
+      }
+    } else if (monkeyMode === "time" || monkeyMode === "words") {
+      const s1 = generateMonkeyWords(10, activeLessonType === "coding" ? calculatedWeakKeysList : [], includeNumbers, includeSymbols, 'standard');
+      const s2 = generateMonkeyWords(10, activeLessonType === "coding" ? calculatedWeakKeysList : [], includeNumbers, includeSymbols, 'standard');
       setTimeTrialSentences([s1, s2]);
     } else {
       setTimeTrialSentences([]);
@@ -650,7 +729,7 @@ export default function App() {
   // Reset practice whenever mode settings change
   useEffect(() => {
     resetPractice();
-  }, [monkeyMode, monkeyLimit, includeNumbers, includeSymbols]);
+  }, [monkeyMode, monkeyLimit, includeNumbers, includeSymbols, activeTab]);
 
   // Run initial alignment on mounted hook
   useEffect(() => {
@@ -898,16 +977,12 @@ export default function App() {
          // Visual shake feedback trigger
          setTimeout(() => setJustWrongKey(null), 300);
          if (profile.soundEnabled ?? true) {
-           playKeyThudSound();
+           playTypingSound('thud');
          }
       } else {
          setJustWrongKey(null);
          if (profile.soundEnabled ?? true) {
-           if ((profile.soundType ?? 'click') === 'click') {
-             playKeyClickSound();
-           } else {
-             playKeyThudSound();
-           }
+           playTypingSound(profile.soundType ?? 'click');
          }
       }
 
@@ -921,7 +996,7 @@ export default function App() {
 
     setTypedText(val);
 
-    if ((monkeyMode === "time" || monkeyMode === "words") && timeTrialSentences.length >= 2) {
+    if ((activeTab === "genz type" || monkeyMode === "time" || monkeyMode === "words") && timeTrialSentences.length >= 2) {
       const targetLen = displayTargetText.length;
       if (val.length >= targetLen) {
         const lastChar = val[val.length - 1];
@@ -938,7 +1013,16 @@ export default function App() {
           setHistoricalTypedLength(prev => prev + targetLen);
           setHistoricalWordCount(prev => prev + wordsInSentence);
 
-          const nextSent = generateMonkeyWords(10, calculatedWeakKeysList, includeNumbers, includeSymbols);
+          let nextSent = "";
+          if (activeTab === "genz type") {
+            if (monkeyMode === "words") {
+              nextSent = generateMonkeyWords(10, [], includeNumbers, includeSymbols, 'genz_words');
+            } else {
+              nextSent = generateMonkeyWords(10, [], includeNumbers, includeSymbols, 'genz_sentences');
+            }
+          } else {
+            nextSent = generateMonkeyWords(10, activeLessonType === "coding" ? calculatedWeakKeysList : [], includeNumbers, includeSymbols, 'standard');
+          }
           setTimeTrialSentences([timeTrialSentences[1], nextSent]);
           setTypedText("");
           setEditedIndices(new Set());
@@ -1236,8 +1320,7 @@ export default function App() {
           weakKeys: calculatedWeakKeysList.length > 0 ? calculatedWeakKeysList : ["a", "p", "o"],
           difficulty: aiCustomDifficulty,
           type: activeLessonType === "coding" ? "coding" : "general",
-          language: aiCustomLanguage,
-          useAi: useAi
+          language: aiCustomLanguage
         })
       });
 
@@ -1254,7 +1337,6 @@ export default function App() {
             snippet_type: "Custom generated"
           };
           setCurrentCodingLesson(generatedCodeLesson);
-          setMonkeyMode("standard");
         } else {
           const generatedGeneralLesson: Lesson = {
             id: `ai-gen-${Date.now()}`,
@@ -1266,7 +1348,6 @@ export default function App() {
           };
           setCurrentGeneralLesson(generatedGeneralLesson);
           setAiCustomLesson(generatedGeneralLesson);
-          setMonkeyMode("standard");
         }
       }
     } catch (e) {
@@ -1275,6 +1356,14 @@ export default function App() {
       setIsGenerating(false);
     }
   };
+
+  useEffect(() => {
+    preloadAllPacks();
+    // Generate AI sentences on mount so that it's ready if they switch to standard mode on practice tab
+    if (activeLessonType === "general" && currentGeneralLesson.category !== "AI Custom") {
+      handleGenerateAiLesson();
+    }
+  }, []);
 
   // call local environment api trigger to generate adaptive practice material from weakest keys of the test
   const handleShareScore = () => {
@@ -1302,8 +1391,7 @@ export default function App() {
           weakKeys: sessionReceipt.weakKeys.length > 0 ? sessionReceipt.weakKeys : ["t", "e", "s", "t"],
           difficulty: activeLessonType === "coding" ? currentCodingLesson.difficulty : currentGeneralLesson.difficulty,
           type: activeLessonType === "coding" ? "coding" : "general",
-          language: activeLessonType === "coding" ? currentCodingLesson.language : "english",
-          useAi: useAi
+          language: activeLessonType === "coding" ? currentCodingLesson.language : "english"
         })
       });
 
@@ -1320,7 +1408,6 @@ export default function App() {
             snippet_type: "Custom generated"
           };
           setCurrentCodingLesson(generatedCodeLesson);
-          setMonkeyMode("standard");
         } else {
           const generatedGeneralLesson: Lesson = {
             id: `ai-gen-${Date.now()}`,
@@ -1332,7 +1419,6 @@ export default function App() {
           };
           setCurrentGeneralLesson(generatedGeneralLesson);
           setAiCustomLesson(generatedGeneralLesson);
-          setMonkeyMode("standard");
         }
         // Close modal and restart practice
         setSessionReceipt(null);
@@ -1543,28 +1629,72 @@ export default function App() {
                 </div>
                 
                 {tempSoundEnabled && (
-                  <div className="flex gap-2 mt-1">
+                  <div className="grid grid-cols-3 gap-2 mt-2">
                     <button
                       type="button"
-                      onClick={() => { setTempSoundType('click'); playKeyClickSound(); }}
-                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all border ${
+                      onClick={() => { setTempSoundType('click'); playTypingSound('click'); }}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all border ${
                         tempSoundType === 'click' 
                           ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300' 
                           : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800'
                       }`}
                     >
-                      Mechanical Click
+                      Click
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setTempSoundType('thud'); playKeyThudSound(); }}
-                      className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-all border ${
+                      onClick={() => { setTempSoundType('thud'); playTypingSound('thud'); }}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all border ${
                         tempSoundType === 'thud' 
                           ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300' 
                           : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800'
                       }`}
                     >
-                      Deep Thud
+                      Thud
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setTempSoundType('moan' as any); playTypingSound('moan'); }}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all border ${
+                        tempSoundType === 'moan' 
+                          ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300' 
+                          : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800'
+                      }`}
+                    >
+                      Comic
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setTempSoundType('typewriter'); playTypingSound('typewriter'); }}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all border ${
+                        tempSoundType === 'typewriter' 
+                          ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300' 
+                          : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800'
+                      }`}
+                    >
+                      Typewriter
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setTempSoundType('retro'); playTypingSound('retro'); }}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all border ${
+                        tempSoundType === 'retro' 
+                          ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300' 
+                          : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800'
+                      }`}
+                    >
+                      Retro Bubble
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setTempSoundType('bubble'); playTypingSound('bubble'); }}
+                      className={`py-1.5 rounded-lg text-[11px] font-bold transition-all border ${
+                        tempSoundType === 'bubble' 
+                          ? 'bg-indigo-500/20 border-indigo-500 text-indigo-300' 
+                          : 'bg-slate-800/50 border-slate-700 text-slate-400 hover:bg-slate-800'
+                      }`}
+                    >
+                      Water Drop
                     </button>
                   </div>
                 )}
@@ -1906,7 +2036,7 @@ export default function App() {
 
         <div className="flex flex-wrap items-center gap-3 md:gap-6">
           <nav className="flex bg-slate-900/50 border border-slate-800 p-1 rounded-xl">
-            {(["practice", "lessons", "coach", "analytics"] as const).map((tab) => (
+            {(["practice", "genz type", "analytics"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -1939,11 +2069,7 @@ export default function App() {
                 saveProfile(updated);
                 setTempSoundEnabled(updated.soundEnabled!);
                 if (updated.soundEnabled) {
-                  if (profile.soundType === 'thud') {
-                    playKeyThudSound();
-                  } else {
-                    playKeyClickSound();
-                  }
+                  playTypingSound(profile.soundType ?? 'click');
                 }
               }}
               title={profile.soundEnabled ?? true ? "Sound On" : "Sound Off"}
@@ -2004,7 +2130,7 @@ export default function App() {
       </header>
 
       {/* Primary content area routing based on navigation state tabs */}
-      {activeTab === "practice" && (
+      {(activeTab === "practice" || activeTab === "genz type") && (
         <main className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch max-w-6xl mx-auto w-full">
           
           {/* Left Side Section: Realtime dynamic diagnostics charts & Adaptive drills setup */}
@@ -2078,54 +2204,49 @@ export default function App() {
                       </span>
                     </div>
                   </div>
-
-                  {/* AI adaptive settings drawer */}
-                  <div className="space-y-3 pt-2">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Adaptive Drill focus</label>
-                      <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-lg">
-                        <button
-                          onClick={() => {
-                            setActiveLessonType("general");
-                            resetPractice();
-                          }}
-                          className={`py-1 text-[10px] font-bold rounded uppercase ${
-                            activeLessonType === "general" ? "bg-slate-800 text-indigo-300" : "text-slate-500"
-                          }`}
-                        >
-                          Tactile Text
-                        </button>
-                        <button
-                          onClick={() => {
-                            setActiveLessonType("coding");
-                            resetPractice();
-                          }}
-                          className={`py-1 text-[10px] font-bold rounded uppercase ${
-                            activeLessonType === "coding" ? "bg-slate-800 text-indigo-300" : "text-slate-500"
-                          }`}
-                        >
-                          Program Code
-                        </button>
+                  
+                  {activeTab === "practice" ? (
+                    <div className="space-y-3 pt-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Adaptive Drill focus</label>
+                        <div className="grid grid-cols-2 gap-1 bg-slate-950 p-1 rounded-lg">
+                          <button
+                            onClick={() => {
+                              setActiveLessonType("general");
+                              setMonkeyMode("words");
+                              resetPractice();
+                            }}
+                            className={`py-1 text-[10px] font-bold rounded uppercase ${
+                              monkeyMode === "words" ? "bg-slate-800 text-indigo-300" : "text-slate-500"
+                            }`}
+                          >
+                            Random Words
+                          </button>
+                          <button
+                            onClick={() => {
+                              setActiveLessonType("general");
+                              setMonkeyMode("standard");
+                              handleGenerateAiLesson();
+                            }}
+                            className={`py-1 text-[10px] font-bold rounded uppercase ${
+                              monkeyMode === "standard" ? "bg-slate-800 text-indigo-300" : "text-slate-500"
+                            }`}
+                          >
+                            Weak AI Keys
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    {activeLessonType === "coding" && (
-                      <div>
-                        <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Target Language</label>
-                        <select
-                          value={aiCustomLanguage}
-                          onChange={(e) => setAiCustomLanguage(e.target.value as any)}
-                          className="w-full bg-slate-950 border border-slate-800/80 rounded-lg px-2 py-1 text-xs text-indigo-200 outline-none"
-                        >
-                          <option value="python">Python Syntax</option>
-                          <option value="javascript">JavaScript Async</option>
-                          <option value="html-css">Tailwind Struct</option>
-                          <option value="sql">SQL Aggregates</option>
-                        </select>
+                  ) : (
+                    <div className="space-y-3 pt-2">
+                      <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                        <span className="text-xs font-bold text-indigo-300">GenZ Edge Mode Active</span>
+                        <p className="text-[10px] text-slate-400 mt-1">Typing highly relatable dark humor and side quests.</p>
                       </div>
-                    )}
-
-                    <div>
+                    </div>
+                  )}
+                  
+                  <div>
                       <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">AI Coach Difficulty</label>
                       <div className="grid grid-cols-3 gap-1 bg-slate-950 p-1 rounded-lg">
                         {(["beginner", "intermediate", "advanced"] as const).map((level) => (
@@ -2141,27 +2262,8 @@ export default function App() {
                         ))}
                       </div>
                     </div>
-                    
-                    <div className="flex items-center justify-between mt-4 border-t border-slate-800/80 pt-3">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-bold text-slate-300 uppercase">AI Generation</span>
-                        <span className="text-[9px] text-slate-500">Toggle offline preloaded sentences</span>
-                      </div>
-                      <button
-                        onClick={() => setUseAi(!useAi)}
-                        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none`}
-                        style={{ backgroundColor: useAi ? '#4f46e5' : '#1e293b' }}
-                      >
-                        <span
-                          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${
-                            useAi ? "translate-x-5" : "translate-x-0.5"
-                          }`}
-                        />
-                      </button>
-                    </div>
                   </div>
                 </div>
-              </div>
 
               {/* Generate Engine run trigger */}
               <button
@@ -2194,7 +2296,12 @@ export default function App() {
                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mr-2">Mode:</span>
                 <div className="flex bg-slate-900 border border-slate-850 p-1 rounded-xl gap-1">
                   <button
-                    onClick={() => { setMonkeyMode("standard"); }}
+                    onClick={() => { 
+                      setMonkeyMode("standard");
+                      if (activeLessonType === "general" && currentGeneralLesson.category !== "AI Custom") {
+                        handleGenerateAiLesson();
+                      }
+                    }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all outline-none ${
                       monkeyMode === "standard" 
                         ? "bg-indigo-600/35 text-indigo-300 shadow shadow-indigo-500/10 border border-indigo-500/30" 
@@ -2573,7 +2680,7 @@ export default function App() {
                       })}
                     </code>
                   </pre>
-                ) : (monkeyMode === "time" || monkeyMode === "words") && timeTrialSentences.length >= 2 ? (
+                ) : (activeTab === "genz type" || monkeyMode === "time" || monkeyMode === "words") && timeTrialSentences.length >= 2 ? (
                   // Custom Time Trial Rolling Layout
                   <div className="flex flex-col gap-5 select-none bg-slate-900/10 p-6 md:p-8 border border-dashed border-slate-800/40 rounded-3xl relative overflow-hidden transition-all duration-300">
                     {/* Active Line (Sentence 1) with key-based flip animation */}
