@@ -1,4 +1,4 @@
-
+this a self project made using google ai studio with an orignal idea for designs and features
 
 This contains everything you need to run your app locally.
 
